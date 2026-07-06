@@ -22,6 +22,7 @@ is self-contained; this page only orders and connects them.
 | MyChangelogger | turns ship/fix ledger entries into a CHANGELOG.md section | none | [my-changelogger.md](my-changelogger.md) |
 | MyDriftWatcher | flags cross-repo convention drift | none | [my-drift-watcher.md](my-drift-watcher.md) |
 | MyGrapher | keeps a repo's knowledge graph fresh for other tools to query | none | [my-grapher.md](my-grapher.md) |
+| MyDescriber | writes/improves a PR's title + description after it's opened | "write a PR title + description for this diff" | [my-describer.md](my-describer.md) |
 | MyCoder | issue → diff → PR (the "act" tool) | deferred | see stub below |
 
 ## Recommended build order
@@ -69,6 +70,12 @@ is self-contained; this page only orders and connects them.
 12. **MyAdvisor** — last: depends on both MyKnowledger's and MySearcher's
     shortlist logic, and its judgment quality can't be meaningfully
     validated against `NoopEngine` (same limitation as MyCoder).
+13. **MyDescriber** — build after MyReviewer (shares `diff()` and the
+    draft/docs-only skip logic) and after MyKnowledger (reuses its
+    shortlist). It's the tool that lets every PR-opening tool's default
+    body stay minimal, so later it's worth revisiting MyTester's and
+    MyChangelogger's docs to confirm their bodies don't duplicate what
+    MyDescriber now owns.
 
 ## Cross-cutting notes
 
@@ -119,6 +126,19 @@ is self-contained; this page only orders and connects them.
   raise the same question — copy from an existing tool repo, or maintain a
   separate `mythings-template`-style repo nothing ever deploys from. Likely
   the same answer should apply to both; not decided here.
+- **PR descriptions are a separate concern from opening a PR.** MyDescriber
+  enriches an already-open PR's title/body rather than every PR-opening
+  tool (MyTester, MyChangelogger, eventually MyCoder) each generating its
+  own prose. The convention this implies: a PR-opening tool's Engine call
+  should stay scoped to its actual job (writing a test, formatting a
+  changelog section) and its default PR body should stay minimal — issue
+  link + a checklist — leaving curated prose to MyDescriber. Not
+  retrofitted into MyTester's/MyChangelogger's existing docs here, but
+  worth confirming when either is picked up for implementation.
+- **`github.GitHub.diff()` now has two callers** (MyReviewer, MyDescriber),
+  which is a stronger signal than either doc alone that it belongs in core
+  sooner rather than later — still a confirm-before-implementing change,
+  not decided by accretion.
 
 ## MyCoder (deferred)
 
