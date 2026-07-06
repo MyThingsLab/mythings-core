@@ -1,0 +1,2 @@
+{"data":{"commit":"008fb17","session":"s0-bootstrap"},"detail":"scaffold the SDK: packaging, CI, architecture doc \u2014 contracts before code","kind":"scaffold","outcome":"success","tool":"claude-code","ts":"2026-07-06T11:56:03Z"}
+{"data":{"commit":"577bc02","session":"s0-bootstrap"},"detail":"append-only JSONL ledger \u2014 the shared-memory contract every tool writes to","kind":"build","outcome":"success","tool":"claude-code","ts":"2026-07-06T11:57:24Z"}
