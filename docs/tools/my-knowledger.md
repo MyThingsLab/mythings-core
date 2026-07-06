@@ -1,90 +1,118 @@
 # MyKnowledger — design plan
 
+**Redesigned.** Earlier drafts of this doc described a project-history Q&A
+tool; that tool is renamed [MyWiki](my-wiki.md) so this name is free for
+its intended scope: *external* domain knowledge.
+
 ## Purpose
 
-Answers "what happened / why" questions across repos' ledgers, grounded
-strictly in recorded history. Package `myknowledger`, backlog label
-`my-knowledger` (consumes a question posted as an issue, answers as a
-comment — same shape as MyReporter, but Q&A instead of a digest).
+Answers technical/domain questions grounded in an external knowledge
+corpus — papers, books, articles, web sources — ingested via the
+`graphify` skill, entirely separate from MyWiki's project-history corpus
+and from MyGrapher's code-repo corpus. Package `myknowledger`, backlog
+label `my-knowledger`.
 
 ## The single Engine call
 
-Required: "answer this question using only the given ledger excerpts."
+Required: "answer this question using only the given excerpts from the
+external knowledge graph."
 
-- **Input:** `EngineRequest.prompt` = the question (issue title + body)
-  plus a deterministically shortlisted set of ledger entries (see pre-work).
-  `context = {"question_issue": N, "candidate_count": k}`.
-- **Output:** `EngineResult.text` = the answer; `data = {"cited":
-  [entry_ts, ...]}` — the entries the answer actually drew on, so a reader
-  can jump to the exact `dev-ledger` line. The model may only answer from
-  the given excerpts; it may not cite an entry not in the shortlist.
-- Against `NoopEngine`: no synthesis — falls back to printing the
-  shortlisted entries verbatim as "here's what I found, unsummarized."
-  Honest degrade, not a wrong answer dressed as a right one.
+- **Input:** the question (issue title + body) plus a deterministically
+  retrieved shortlist of nodes/passages from an existing external
+  `graphify-out/` corpus, via `graphify query "<question>"` — this is
+  graphify's own retrieval traversal (BFS/DFS), not extraction, so it's
+  LLM-free. `context = {"question_issue": N, "candidate_count": k}`.
+- **Output:** `data = {"answer": str, "cited": [source_id, ...]}` —
+  citations point at specific ingested sources (paper title/section, URL,
+  book + page, whatever metadata graphify's nodes carry). Same discipline
+  as MyWiki: the model may only cite from the given excerpts.
+- Against `NoopEngine`: no synthesis — prints the retrieved passages
+  verbatim with their source citations, same honest degrade as MyWiki.
 
 ## Deterministic pre-work
 
 1. Read the question issue (label `my-knowledger`).
-2. Merge every configured repo's `Ledger` + `dev-ledger/*.jsonl` streams,
-   sorted by `ts` (same aggregation MyReporter already does — worth
-   factoring into a shared helper once both exist, see open questions).
-3. Keyword/date-match the question against `detail` + `data` fields; take
-   the top N (default 30) by overlap as the shortlist — same
-   shortlist-then-judge shape as MySearcher and MyReviewer's diff cap, for
-   the same reason: bound the Engine prompt, keep the cost predictable.
-4. If the shortlist is empty (no term overlap at all), skip the Engine call
-   entirely and post "no relevant history found" — a deterministic
-   short-circuit, not a model guess from nothing.
+2. Confirm an external-knowledge `graphify-out/` corpus already exists —
+   see the invariant below; MyKnowledger never builds one.
+3. Run `graphify query "<question>"` (or `--dfs` to trace one specific
+   thread) against that corpus.
+4. Cap the retrieved excerpt set with graphify's own `--budget` flag — same
+   size-cap discipline as every other retrieval tool in this batch
+   (MySearcher's candidate cap, MyReviewer's diff cap, MyWiki's shortlist
+   cap).
+5. If retrieval returns nothing, skip the Engine call and post "no
+   relevant source found in the knowledge corpus" — same deterministic
+   short-circuit as MyWiki's no-match case.
 
 ## Ledger
 
 - **Writes:** `kind=knowledge`, `outcome=success|skipped`, `detail`=the
-  question (truncated), `data={question, cited_entries, comment_url}`.
-- **Reads:** the full merged ledger + dev-ledger stream across every repo
-  it's configured to watch (read-only, same as MyReporter).
+  question (truncated), `data={question, cited_sources, comment_url}`.
+- **Reads:** nothing beyond the external graph — no dedupe needed; the same
+  question can be asked more than once without collision (unlike
+  MyReviewer/MyDescriber, which dedupe against an unchanged diff).
 
 ## Guard & Workspace
 
-- No `Workspace` — read-only over ledgers, no tree edits, no PR.
-- The only side effect is `gh issue comment`, an `Action(kind="bash", ...)`
-  through `Policy` — resolves `ALLOW` by default under MyGuard's rules,
-  same as MyReporter's and MySearcher's comment paths.
+- No `Workspace`, no PR — comment-only side effect through `Policy`,
+  `ALLOW` by default, same as MyWiki/MyReporter/MySearcher's comment paths.
+- **Invariant: MyKnowledger never ingests new sources itself** — mirrors
+  MyGrapher's "never bootstraps" invariant exactly. Growing the corpus
+  (`graphify add <url>`, or `graphify <path> --mode deep` over a folder of
+  downloaded papers) is a human/interactive-session action, done out of
+  band, because graphify's ingestion path calls an LLM for entity
+  extraction. Importing that into MyKnowledger's own CI-invoked run would
+  smuggle a second hidden Engine call into a tool whose harness contract
+  says exactly one — the same problem already resolved for MyGrapher, and
+  resolved here the same way.
 
 ## CLI surface
 
 ```
-myknowledger ask --issue <number> [--repos core,my-guard,...]
+myknowledger ask --issue <number> [--corpus-path <path>]
 ```
 
 ## Test plan
 
-- **Happy path:** fixture ledgers across two repos, one containing a
-  `kind=decision` entry whose text matches the question's keywords;
-  scripted `Engine` reply citing it; assert the posted comment includes the
-  citation and `kind=knowledge`/`outcome=success` is written.
-- **Edge case (no match):** a question sharing no terms with any entry;
-  assert the Engine is never called (verify via a spy `Engine`) and
-  `outcome=skipped`.
-- Mock only `github.Runner`; ledger merging is exercised against real temp
-  JSONL fixtures.
+- **Happy path:** a fixture external graph (a couple of ingested-paper
+  nodes) and a question matching one of them; scripted `Engine` reply
+  citing it; assert the comment includes the citation and
+  `kind=knowledge`/`outcome=success` is written.
+- **Edge case (no match):** retrieval returns nothing; assert the Engine is
+  never called (verify via a spy `Engine`) and `outcome=skipped`.
+- Mock `github.Runner` and the `graphify`/`graphifyy` CLI subprocess
+  boundary (same fake-runner style as MyGrapher's tests); never mock the
+  retrieval-then-cite shape itself.
 
 ## Dependencies & build order
 
-Depends on core `ledger`, `github`, `policy`. Shares its ledger-merging
-logic with MyReporter (step 2) — build after MyReporter and consider
-whether that merge routine belongs in `mythings-core` once two tools need
-it independently (a "promote to core once duplicated" rule worth adopting
-generally, see the cross-cutting note in the README). Independent of
-MySearcher/MyGrapher for v0 (keyword match is sufficient); designed so a
-future revision can swap in graph-based retrieval the same way MySearcher's
-doc already flags.
+Depends on core `ledger`, `github`, `policy`. Depends on the
+`graphify`/`graphifyy` CLI (external dependency, same flag already raised
+for MyGrapher and MyTelegramBot) and a pre-bootstrapped external-knowledge
+corpus (built out of band, by a human). Independent of MyWiki — same
+"shortlist, then one Engine call to cite an answer" shape, different
+corpus — but shares enough structure with it, MySearcher, MyAdvisor, and
+MyDescriber that this is now the **fifth** tool doing "retrieve then cite,"
+which is a real signal for a shared core helper (see the cross-cutting
+note in [README.md](README.md)). Build alongside or after MyGrapher — both
+share the "requires a pre-bootstrapped `graphify-out/`, never bootstraps it
+itself" invariant and the same mocked-CLI test style, so building them
+close together avoids re-deriving that pattern twice.
 
 **Open questions:**
-- Which repos MyKnowledger watches needs a config (a list, presumably in
-  the workspace, not per-repo) — not decided; assumed a `--repos` flag for
-  v0 rather than an implicit "all repos under the org" default, to avoid
-  surprise cost/latency as the org grows.
-- Whether ledger-merging should be factored into a shared core helper now
-  or left duplicated until a third tool needs it — leaving unresolved
-  deliberately; premature abstraction after only two callers is exactly
-  the kind of thing not worth deciding yet.
+- **Where does the external corpus live?** It isn't code, and isn't tied
+  to any single tool repo — likely a dedicated location at the workspace
+  level (e.g. `MyThingsLab/knowledge/` with its own `graphify-out/`),
+  separate from any git repo the harness manages, since it's shared
+  reference material rather than something that ships with a tool. Not
+  decided.
+- Should source PDFs/books themselves be checked into that location for
+  provenance/reproducibility, or just the ingested graph (smaller, but the
+  source of truth then lives externally — a reading list, a Zotero
+  library)? Flagged, not decided.
+- **Five tools now independently reuse a "shortlist from a corpus, then one
+  Engine call to cite an answer" shape** (MyWiki, MySearcher's ranking,
+  MyAdvisor, MyDescriber, MyKnowledger). Strong enough signal to consider a
+  shared retrieval-and-cite helper in `mythings-core` — though putting
+  RAG-specific shape into a dependency-free SDK deserves its own
+  discussion before committing, not decided by accretion here.

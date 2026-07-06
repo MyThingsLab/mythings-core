@@ -17,7 +17,7 @@ them under conventional-changelog-style headings, it doesn't compose prose.
 1. Read the target repo's `dev-ledger/*.jsonl`, sorted by `ts`.
 2. Take entries since the last `kind=changelog` entry this tool wrote (or
    all-time on first run) — same incremental-window pattern as MyReporter
-   and MyKnowledger.
+   and MyWiki.
 3. Group by `kind`: `ship` → "Shipped", `build` → "Added/Changed", `fix` →
    "Fixed", `decision` → omitted (internal rationale, not user-facing).
 4. Render as a new `## [unreleased]` (or `## [X.Y.Z] - date` if

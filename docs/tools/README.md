@@ -17,7 +17,8 @@ is self-contained; this page only orders and connects them.
 | MyGroomer | labels/splits raw issues into ready units | "split/label this issue" | [my-groomer.md](my-groomer.md) |
 | MyTelegramBot | pushes ledger notifications; relays `Policy` `ASK` to a human over Telegram | none | [my-telegram-bot.md](my-telegram-bot.md) |
 | MyScaffolder | bootstraps a new My[X] tool repo from a proposal | "expand a proposal into the four CLAUDE.md seams" | [my-scaffolder.md](my-scaffolder.md) |
-| MyKnowledger | answers "what happened / why" from ledger history | "answer this question using only these ledger excerpts" | [my-knowledger.md](my-knowledger.md) |
+| MyWiki | answers "what happened / why" from *this project's own* ledger history | "answer this question using only these ledger excerpts" | [my-wiki.md](my-wiki.md) |
+| MyKnowledger | answers domain questions from *external* literature (papers/books/web) | "answer this question using only these knowledge-graph excerpts" | [my-knowledger.md](my-knowledger.md) |
 | MyAdvisor | recommends a course of action with trade-offs | "recommend an answer, with trade-offs" | [my-advisor.md](my-advisor.md) |
 | MyChangelogger | turns ship/fix ledger entries into a CHANGELOG.md section | none | [my-changelogger.md](my-changelogger.md) |
 | MyDriftWatcher | flags cross-repo convention drift | none | [my-drift-watcher.md](my-drift-watcher.md) |
@@ -55,27 +56,32 @@ is self-contained; this page only orders and connects them.
    editing one well-understood file. Build early relative to the rest of
    this second batch, right after MyReporter (shares its ledger-reading
    conventions).
-8. **MyKnowledger** — reuses MyReporter's ledger-merging logic; build after
-   it. Independent of MySearcher/MyGrapher for v0 (keyword match is enough).
+8. **MyWiki** — reuses MyReporter's ledger-merging logic; build after it.
+   Independent of MySearcher/MyGrapher for v0 (keyword match is enough).
 9. **MyGrapher** — build after MySearcher: its purpose is retrofitting
    MySearcher's (and later MyReviewer's) naive shortlist step with a real
    graph query, so MySearcher needs to exist first to have something worth
    retrofitting.
-10. **MyScaffolder** — meta relative to every other tool; doesn't pay off
+10. **MyKnowledger** — build alongside or right after MyGrapher: both share
+    the "requires a pre-bootstrapped `graphify-out/`, never bootstraps it
+    itself" invariant and the same mocked-CLI test style, over two
+    different corpora (code vs. external literature). Needs a
+    pre-bootstrapped external-knowledge graph, built out of band by a
+    human, before it's testable end to end.
+11. **MyScaffolder** — meta relative to every other tool; doesn't pay off
     until several more tool proposals are queued. Build once that backlog
     exists, not first.
-11. **MyDriftWatcher** — low urgency while only 2-3 repos exist; drift only
+12. **MyDriftWatcher** — low urgency while only 2-3 repos exist; drift only
     matters once there's enough repos to diverge. Most valuable once
     MyScaffolder is producing new repos regularly.
-12. **MyAdvisor** — last: depends on both MyKnowledger's and MySearcher's
+13. **MyAdvisor** — last: depends on both MyWiki's and MySearcher's
     shortlist logic, and its judgment quality can't be meaningfully
     validated against `NoopEngine` (same limitation as MyCoder).
-13. **MyDescriber** — build after MyReviewer (shares `diff()` and the
-    draft/docs-only skip logic) and after MyKnowledger (reuses its
-    shortlist). It's the tool that lets every PR-opening tool's default
-    body stay minimal, so later it's worth revisiting MyTester's and
-    MyChangelogger's docs to confirm their bodies don't duplicate what
-    MyDescriber now owns.
+14. **MyDescriber** — build after MyReviewer (shares `diff()` and the
+    draft/docs-only skip logic) and after MyWiki (reuses its shortlist).
+    It's the tool that lets every PR-opening tool's default body stay
+    minimal, so later it's worth revisiting MyTester's and MyChangelogger's
+    docs to confirm their bodies don't duplicate what MyDescriber now owns.
 
 ## Cross-cutting notes
 
@@ -112,14 +118,31 @@ is self-contained; this page only orders and connects them.
   `--update` path — so it can't smuggle a second Engine call into tools
   that consume it. It requires a graph to already exist (bootstrapped once
   by a human via `/graphify`), and refuses to bootstrap one itself.
-- **Cross-tool code reuse isn't settled.** MyAdvisor wants MyKnowledger's
-  and MySearcher's shortlist logic; MyKnowledger and MyReporter share
-  ledger-merging. Two options: `My[X]` tools depend on each other as
-  installed packages (like `my-guard` depends on `mythings-core`), or
-  shared retrieval helpers get promoted into `mythings-core` once
-  duplicated across ≥2 tools. Leaning toward the latter — it keeps the
-  harness's "only shared dependency is core" property intact — but this
-  isn't decided; each affected doc flags it rather than picking silently.
+  MyKnowledger shares this exact invariant over a second, separate
+  graphify corpus (external literature instead of the repo) — the "never
+  bootstraps, only queries" rule generalizes to any tool wrapping graphify.
+- **MyWiki vs. MyKnowledger — two corpora, one shape.** Early drafts named
+  the ledger-history Q&A tool "MyKnowledger"; it's renamed **MyWiki** so
+  "MyKnowledger" is free for what it should actually mean: domain knowledge
+  from *external* sources (papers, books, the internet), not this
+  project's own history. Both tools do the identical "retrieve a
+  shortlist, then one Engine call that may only cite from it" shape — they
+  just point at different corpora (project ledger vs. an external
+  literature graph) — and both write distinct ledger `kind`s (`wiki` vs.
+  `knowledge`) so their entries never collide.
+- **Cross-tool code reuse isn't settled.** MyAdvisor wants MyWiki's and
+  MySearcher's shortlist logic; MyWiki and MyReporter share ledger-merging.
+  Counting MyKnowledger, **five** tools now independently implement
+  "shortlist from a corpus, then cite" (MyWiki, MySearcher, MyAdvisor,
+  MyDescriber, MyKnowledger) — a stronger signal than before that this
+  shape deserves either a shared core helper or a settled reuse mechanism.
+  Two options: `My[X]` tools depend on each other as installed packages
+  (like `my-guard` depends on `mythings-core`), or shared retrieval helpers
+  get promoted into `mythings-core` once duplicated across ≥2 tools.
+  Leaning toward the latter — it keeps the harness's "only shared
+  dependency is core" property intact — but putting RAG-specific shape
+  into a dependency-free SDK deserves its own discussion; not decided here,
+  each affected doc flags it rather than picking silently.
 - **A repeated open question: reference scaffold vs. dedicated template
   repo.** Both MyScaffolder (copying a new tool's boilerplate) and
   MyDriftWatcher (defining "canonical" for drift comparison) independently

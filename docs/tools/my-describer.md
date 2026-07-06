@@ -16,7 +16,7 @@ issue and directly relevant ledger history."
 - **Input:** the PR's diff (via `github.GitHub.diff()` — see dependencies),
   the linked issue's title/body (parsed from the PR body's `Closes #N` /
   `Part of #N` reference), and a small ledger-excerpts bundle (reuse of
-  MyKnowledger's shortlist logic — third tool to want this, see the
+  MyWiki's shortlist logic — third tool to want this, see the
   cross-cutting reuse note in [README.md](README.md)).
 - **Output:** `data = {"title": str, "body": str}`. `body` mirrors the
   `## Summary` / `## Test plan` shape already used for this workspace's own
@@ -39,7 +39,7 @@ issue and directly relevant ledger history."
 4. Parse the linked issue number out of the PR body's `Closes #N` / `Part
    of #N` convention; fetch its title/body.
 5. Gather a small ledger-excerpts bundle related to the issue/PR (reuse
-   MyKnowledger's shortlist logic).
+   MyWiki's shortlist logic).
 6. Cap the combined prompt size — same size-cap pattern used everywhere
    else in this batch (MyReviewer's diff truncation, MySearcher's candidate
    cap, MyAdvisor's context bundle cap).
@@ -82,9 +82,9 @@ mydescriber write --pr <number> [--repo owner/name]
 Depends on core `ledger`, `policy`, `github` (needs `diff()` — the
 **second** tool wanting it after MyReviewer, strengthening the case to add
 it now rather than defer — and a new `pr_edit()` method). Reuses
-MyKnowledger's shortlist logic (the **third** consumer of that reuse
+MyWiki's shortlist logic (the **third** consumer of that reuse
 question, alongside MyAdvisor). Build after MyReviewer (shares `diff()`
-and the draft/docs-only skip pattern) and after MyKnowledger (reuses its
+and the draft/docs-only skip pattern) and after MyWiki (reuses its
 shortlist).
 
 **Open questions:**
