@@ -35,6 +35,11 @@ dedicated (not-a-tool) template repo — build that before MyScaffolder.
 | MyPlanner | produces a priority-ordered, multi-item plan across the whole backlog | required: "propose a sequence, with rationale" | [my-planner.md](my-planner.md) |
 | MySite | drafts content/design changes for a personal Jekyll site (default: `lorenzoliuzzo/lorenzoliuzzo.github.io`) | "draft the Jekyll content for this request" | [my-site.md](my-site.md) |
 | MyDocs | keeps the fleet's technical-docs site (`mythingslab.github.io`) in sync with each tool's README/CLAUDE.md | "write/update this tool's docs page from its README + seams" | [my-docs.md](my-docs.md) |
+| MyTypster | drafts and compiles a document as typeset Typst source + PDF | "draft the Typst source for this content request" | [my-typster.md](my-typster.md) |
+| MyPresentation | drafts a slide-by-slide talk outline, then renders it via MyTypster | "draft the slide outline + speaker notes" | [my-presentation.md](my-presentation.md) |
+| MyUni | decomposes a field of study into a curriculum, opening one issue per topic for MyResearcher | "decompose this field into an ordered curriculum" | [my-uni.md](my-uni.md) |
+| MyProfessor | teaches or quizzes on a topic already in MyKnowledger's corpus | "write a lesson" / "grade this answer" | [my-professor.md](my-professor.md) |
+| MyNews | discovers current sources on a schedule and posts a dated digest since the last run | "write a digest from these newly discovered items" | [my-news.md](my-news.md) |
 | MyCoder | issue → diff → PR (the "act" tool) | deferred | see stub below |
 
 ## Recommended build order
@@ -123,6 +128,27 @@ dedicated (not-a-tool) template repo — build that before MyScaffolder.
     write into — not on MySite (different target repo, no shared code).
     Build after at least a couple of tools have shipped READMEs worth
     publishing.
+19. **MyTypster** — added 2026-07-08, from a user batch of 15 tool ideas
+    (see the cross-cutting note below on how that batch was triaged).
+    Zero dependency on any other `My[X]` tool, but needs the `typst` CLI
+    added to the CI image (new toolchain dependency, confirm first) and
+    the public-repo/PII open question resolved before it drafts anything
+    containing personal data. Build any time once that's settled —
+    **MyPresentation hard-depends on it**, so build it first between the
+    two.
+20. **MyPresentation** — added 2026-07-08, same batch. Depends on
+    MyTypster for compilation; build after it.
+21. **MyUni** — added 2026-07-08, same batch. Needs the same
+    `create_issue`/`add_labels` core batch MyGroomer needs (§ Core
+    additions in [BUILD_GUIDE.md](BUILD_GUIDE.md)) — build after that
+    lands. Soft-depends on MyResearcher existing to consume what it opens.
+22. **MyProfessor** — added 2026-07-08, same batch. Depends on
+    MyKnowledger's retrieval pattern and pre-bootstrapped corpus; build
+    after MyKnowledger.
+23. **MyNews** — added 2026-07-08, same batch. Same retrieval-layer shape
+    as MyResearcher; build alongside or after it, reusing its
+    provider-config pattern. First doc whose primary trigger is a
+    `schedule:` cron rather than an opened issue.
 
 ## Cross-cutting notes
 
@@ -234,6 +260,17 @@ dedicated (not-a-tool) template repo — build that before MyScaffolder.
   it at a personal repo (`lorenzoliuzzo/lorenzoliuzzo.github.io`) rather
   than a fleet repo. No new capability is needed for this — it's confirmed
   proof the existing design already generalizes past the org boundary.
+- **Two of the 2026-07-08 batch's fifteen proposed names turned out to be
+  existing tools by another name, not new ones.** "my-designer" (recommend
+  product/design decisions) is MyAdvisor's exact shape over a different
+  question domain — folded into [my-advisor.md](my-advisor.md) rather
+  than shipped as a sixth "retrieve, then recommend" tool. "my-fact-check"
+  (verify a claim against sources) is MyKnowledger's exact "retrieve, then
+  the model may only cite the given excerpts" shape, phrased as a claim
+  instead of a question — added as MyKnowledger's `verify` subcommand
+  rather than a sixth standalone corpus-citing tool (see the "Cross-tool
+  code reuse isn't settled" note above, now doubly confirmed: catching
+  the collision *before* drafting a doc is cheaper than catching it after).
 - **MySite and MyDocs are both content-publishing tools with no shared
   code.** They look superficially similar (draft Jekyll content, open a
   PR) but point at different corpora (a free-form content request vs. a
@@ -275,3 +312,38 @@ exists. Revisit once Phase 1 (real backends, cheapest-capable-first per
 as the other five, with `Workspace` + `Policy` doing the heaviest lifting
 since it's the only tool that both edits code *and* needs the sandboxing
 that implies.
+
+**"my-renderer" (2026-07-08) is a candidate MyCoder target, not a tool of
+its own.** Proposed by the user as "an example of high-difficulty codebase
+that can be implemented with the fleet" — i.e. a deliberately hard build
+(a renderer, a compiler, whatever's chosen) meant to stress-test the
+fleet's ability to build real software, not a My[X] fleet-management bot.
+It has no issue-driven shape, no single narrow Engine call, no ledger
+`kind` of its own — it's *work for MyCoder to do* once MyCoder exists,
+the same way any other feature request would be. Revisit choosing a
+concrete target once MyCoder is real.
+
+## Parked: personal continuous-service tools (2026-07-08)
+
+The same user batch that produced MyTypster/MyPresentation/MyUni/
+MyProfessor/MyNews above also proposed six more: **my-filemanager**
+(manage files under `home`), **my-drive** (archives), **my-music**
+(freely listen to music), **my-photos** (Immich integration), **my-mood**,
+and **my-sleep** (quality tracking, possibly wearable integration).
+
+None of these fit the batch's shared contract — GitHub issue triggers one
+deterministic pre-step, one narrowly-scoped Engine call, a PR/comment,
+`Policy`/`Guard` in between, no daemon. They're **always-on personal
+services or integrations** instead: real external accounts/OAuth (Immich,
+a wearable's API), continuous data ingestion outside any git repo, and in
+my-mood/my-sleep's case, personal health data — a materially different
+sandboxing and secrets story than "a bot that reacts to GitHub issues."
+
+Deliberately **not drafted as docs here** — forcing them into the
+issue/PR shape would be a bad fit, and the fleet has no confirmed contract
+yet for "always-on personal service with external credentials," which is
+exactly the kind of architectural addition the workspace's
+architectural-change rule says to propose and confirm *before* any
+consuming tool's build starts, not accrete tool-by-tool. Revisit as a
+deliberate design conversation (what would that contract even look like
+in `mythings-core`?) before writing design docs for any of these six.
