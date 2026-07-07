@@ -58,12 +58,35 @@ into a paragraph of prose:
 ## CLI surface
 
 ```
-myreporter digest [--since ISO8601] [--repo owner/name]
-myreporter post --issue <number> [--since ISO8601] [--summarize]
+myreporter digest [--since ISO8601] [--repo owner/name] [--handoff]
+myreporter post --issue <number> [--since ISO8601] [--summarize] [--handoff]
 ```
 
 `digest` prints markdown to stdout (dev loop / CI job summary); `post`
 comments it on an issue.
+
+## Handoff mode (`--handoff`)
+
+Same merged/windowed entries, different render: instead of the aggregate
+digest (counts + verbatim decisions/ships + pending PRs), it produces a
+resume-context brief aimed at a new session or agent picking the work back
+up, not a human activity report:
+
+- **Open threads** — `kind=ask`/`kind=drift` entries in the window (things a
+  prior session flagged as needing judgment or attention).
+- **Recent decisions** — the last few `kind=decision` entries verbatim (the
+  *why*, which is exactly what a resuming session would otherwise have to
+  re-derive from git history).
+- **Pending PRs** — same computation as the digest's pending-PR list.
+- **Last shipped** — the most recent `kind=ship` entry, so the reader knows
+  where the fleet left off.
+- Empty window → `"Clean baseline — nothing pending, no open threads."`,
+  not an exception.
+
+`--summarize` composes with `--handoff` unchanged — it's the same Engine
+seam (rewrite the already-computed markdown as prose), just fed the handoff
+markdown instead of the digest markdown. No new Engine call was introduced;
+this is a second deterministic renderer over the same windowed entries.
 
 ## Test plan
 
