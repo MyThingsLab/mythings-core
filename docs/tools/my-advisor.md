@@ -9,6 +9,15 @@ Recommends a course of action on a posed "should we do X" question,
 grounded in ledger history and relevant code, with explicit trade-offs.
 Package `myadvisor`, backlog label `my-advisor`.
 
+**Absorbs the "my-designer" idea (2026-07-08).** A separately proposed
+"my-designer" (recommend product/design decisions) turned out to be the
+identical shape — a question, grounded context, a recommendation with
+trade-offs — just over a different question domain (product/UX choices
+vs. architectural/process ones). Rather than build a second near-duplicate
+"retrieve, then recommend" tool, MyAdvisor's scope is confirmed to cover
+both: the domain is whatever the issue asks about, not a fixed category.
+No separate `my-designer` doc/repo.
+
 ## The single Engine call
 
 Required: "recommend an answer, with trade-offs, using the given context."
