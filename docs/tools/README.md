@@ -30,6 +30,8 @@ dedicated (not-a-tool) template repo — build that before MyScaffolder.
 | MyDriftWatcher | flags cross-repo convention drift | none | [my-drift-watcher.md](my-drift-watcher.md) |
 | MyGrapher | keeps a repo's knowledge graph fresh for other tools to query | none | [my-grapher.md](my-grapher.md) |
 | MyDescriber | writes/improves a PR's title + description after it's opened | "write a PR title + description for this diff" | [my-describer.md](my-describer.md) |
+| MyProjector | keeps the fleet's GitHub Project board + tracking issues synced to live repo state | optional: "rewrite this card's last/next-step summary" | [my-projector.md](my-projector.md) |
+| MyPlanner | produces a priority-ordered, multi-item plan across the whole backlog | required: "propose a sequence, with rationale" | [my-planner.md](my-planner.md) |
 | MyCoder | issue → diff → PR (the "act" tool) | deferred | see stub below |
 
 ## Recommended build order
@@ -94,6 +96,18 @@ dedicated (not-a-tool) template repo — build that before MyScaffolder.
     It's the tool that lets every PR-opening tool's default body stay
     minimal, so later it's worth revisiting MyTester's and MyChangelogger's
     docs to confirm their bodies don't duplicate what MyDescriber now owns.
+15. **MyProjector** — added 2026-07-07, proposed by the user directly
+    after watching a whole session of manual GitHub Project board
+    bookkeeping. Independent of every other `My[X]` tool (only needs core
+    `ledger`/`policy` + the new `mythings.projects` module), so it could
+    build early like MyOrchestrator/MyReporter — but it's gated on that
+    new core module landing first, which is the real constraint on timing,
+    not tool ordering.
+16. **MyPlanner** — added 2026-07-07 alongside MyProjector, in response to
+    the same session. Hard-depends on MyOrchestrator's `manifest.json`
+    (already shipped, so buildable now) and soft-depends on MyProjector
+    (degrades gracefully if built first). Build after MyProjector if
+    sequencing by convenience; not blocked on it either way.
 
 ## Cross-cutting notes
 
@@ -186,6 +200,27 @@ dedicated (not-a-tool) template repo — build that before MyScaffolder.
   which is a stronger signal than either doc alone that it belongs in core
   sooner rather than later — still a confirm-before-implementing change,
   not decided by accretion.
+- **Decision authority across MyOrchestrator / MyPlanner / MyProjector —
+  resolved 2026-07-07.** Adding two more fleet-wide tools risked three
+  sources of truth disagreeing about "what happens next." The line:
+  - **MyOrchestrator** is the single source of truth for *the next
+    action*. Short-horizon, mostly deterministic, one Engine call only to
+    break a genuine tie. Nothing else picks or dispatches work.
+  - **MyPlanner** produces a longer-horizon *sequence with rationale* and
+    feeds it into MyOrchestrator's ranking as one more signal — the same
+    role its existing `kind=drift`/`kind=ask` urgency boosts already play.
+    MyPlanner never picks or dispatches directly, mirroring MyOrchestrator's
+    own "recommends, doesn't invoke another tool's CLI" stance one level up.
+  - **MyProjector** makes no priority judgments at all — pure bookkeeping,
+    syncing dashboard/tracking-issue state to match what already happened.
+  - This also answers a fourth idea raised in conversation: a dedicated
+    agent to decide *when it's time to build a particular unbuilt tool*.
+    **Not a separate tool** — that decision already belongs to
+    MyOrchestrator (its existing dependency-readiness check + ranking over
+    `manifest.json`, per its own doc's steps 3-4), just enriched once
+    MyPlanner's pacing signal exists to boost/penalize candidates the same
+    way urgency signals already do. A fourth tool here would just be a
+    second, competing implementation of MyOrchestrator's own job.
 
 ## MyCoder (deferred)
 
