@@ -41,6 +41,8 @@ dedicated (not-a-tool) template repo — build that before MyScaffolder.
 | MyUni | decomposes a field of study into a curriculum, opening one issue per topic for MyResearcher | "decompose this field into an ordered curriculum" | [my-uni.md](my-uni.md) |
 | MyProfessor | teaches or quizzes on a topic already in MyKnowledger's corpus | "write a lesson" / "grade this answer" | [my-professor.md](my-professor.md) |
 | MyNews | discovers current sources on a schedule and posts a dated digest since the last run | "write a digest from these newly discovered items" | [my-news.md](my-news.md) |
+| MyConductor | orders the fleet's open PRs into a coherent, dependency-safe merge sequence | "order these PRs into a coherent merge story, within the given constraints" | [my-conductor.md](my-conductor.md) |
+| MySyndicator | applies one change to many repos, one PR each (deterministic fan-out) | none — deterministic | [my-syndicator.md](my-syndicator.md) |
 | MyCoder | issue → diff → PR (the "act" tool) | deferred | see stub below |
 
 ## Recommended build order
@@ -299,6 +301,37 @@ dedicated (not-a-tool) template repo — build that before MyScaffolder.
     MyPlanner's pacing signal exists to boost/penalize candidates the same
     way urgency signals already do. A fourth tool here would just be a
     second, competing implementation of MyOrchestrator's own job.
+- **MyConductor sits on the merge axis, not the work axis.** The decision
+  authority above is all about *what to do next*; MyConductor is about *what to
+  merge next among already-open PRs* — a different corpus (open PRs + a
+  dependency DAG) and a different verb (merge, not build/pick). It never picks or
+  dispatches work and never merges; it recommends an order and narrates it, so it
+  doesn't compete with MyOrchestrator/MyPlanner. It's the tool that turns the
+  cross-repo merge ordering we've been doing by hand (e.g. `mythings-core#29`
+  before `my-projector#1`) into a computed, dependency-safe sequence.
+- **Promote an ordered-selection helper into core — now at three callers.**
+  MyPlanner ("propose a sequence"), MyOrchestrator's tie-break ("break a tie
+  among top candidates"), and MyConductor ("order these PRs") all implement the
+  same shape: assemble a candidate set, one Engine call to order/select within
+  deterministic constraints, validate the reply is a permutation of the input,
+  and fall back to a deterministic order against `NoopEngine`. Three independent
+  callers is the threshold this doc set (see the shortlist-then-cite note) for
+  extracting a shared helper into `mythings-core` — e.g. `mythings.selection`
+  with an `ordered_selection(items, engine, *, constraints, fallback)` that owns
+  the prompt/parse/permutation-guard/topological-repair/Noop-fallback plumbing.
+  Build it before MyConductor so MyConductor is thin on top of it, and retrofit
+  MyPlanner/MyOrchestrator to consume it rather than re-deriving the shape.
+- **Promote shared test fixtures into a `mythings.testing` pytest plugin.**
+  `my-planner` and `my-projector` each hand-copied an autouse `_attended_env`
+  fixture (unset `GITHUB_ACTIONS` so the suite defaults to the attended path;
+  the unattended fail-closed behavior is opted into per test). That is exactly
+  the "same change to N repos" smell MySyndicator addresses at the file level —
+  but for *testable Python* the cleaner fix is a single source, mirroring how
+  `HARNESS.md` is canonical-in-core-and-vendored: ship the fixture as a
+  `mythings.testing` pytest plugin so a tool enables it instead of copying it.
+  Do this the next time a third tool needs it (or alongside MyConductor, which
+  will want the same fixture). This shrinks what MySyndicator ever has to fan
+  out to genuinely per-repo files (CI yaml, vendored `HARNESS.md`, banners).
 
 ## MyCoder (deferred)
 
