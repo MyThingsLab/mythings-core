@@ -153,6 +153,13 @@ dedicated (not-a-tool) template repo — build that before MyScaffolder.
     as MyResearcher; build alongside or after it, reusing its
     provider-config pattern. First doc whose primary trigger is a
     `schedule:` cron rather than an opened issue.
+24. **MyLibrarian** — added 2026-07-08. Independent of every tool above; its
+    stdlib-only PyPI/npm/GitHub retrieval layer directly reuses MyResearcher's
+    pattern (naive tokenizer, size-capped shortlist, cite/permutation-only
+    Engine output), so build it alongside or after MyResearcher rather than
+    from scratch. No dependency on MyAdvisor/MyKnowledger despite the shared
+    "discover, then judge" shape — see the cross-cutting note distinguishing
+    the three.
 
 ## Cross-cutting notes
 
