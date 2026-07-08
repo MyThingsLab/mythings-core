@@ -44,6 +44,7 @@ dedicated (not-a-tool) template repo — build that before MyScaffolder.
 | MyNews | discovers current sources on a schedule and posts a dated digest since the last run | "write a digest from these newly discovered items" | [my-news.md](my-news.md) |
 | MyConductor | orders the fleet's open PRs into a coherent, dependency-safe merge sequence | "order these PRs into a coherent merge story, within the given constraints" | [my-conductor.md](my-conductor.md) |
 | MySyndicator | applies one change to many repos, one PR each (deterministic fan-out) | none — deterministic | [my-syndicator.md](my-syndicator.md) |
+| MyArchivist | catalogs a personal book/materials collection (physical + digital) into a unified, cross-referenced index | optional: "assign a subject tag + blurb" | [my-archivist.md](my-archivist.md) |
 | MyCoder | issue → diff → PR (the "act" tool) | deferred | see stub below |
 
 ## Recommended build order
@@ -160,6 +161,13 @@ dedicated (not-a-tool) template repo — build that before MyScaffolder.
     from scratch. No dependency on MyAdvisor/MyKnowledger despite the shared
     "discover, then judge" shape — see the cross-cutting note distinguishing
     the three.
+25. **MyArchivist** — added 2026-07-08. Independent of every other tool;
+    its ISBN-lookup layer shares MyResearcher's/MyLibrarian's stdlib-only
+    HTTP retrieval pattern, so build it alongside or after either rather
+    than from scratch. Second tool (after MySite) whose target repo lives
+    outside the MyThingsLab org, and the first triggered by a local
+    `scan` command rather than an opened issue (`schedule:`-triggered
+    MyNews is the closer precedent than issue-driven tools).
 
 ## Cross-cutting notes
 
@@ -296,6 +304,13 @@ dedicated (not-a-tool) template repo — build that before MyScaffolder.
   No two ever answer the same question, so none absorbs another — same
   "confirm the corpus/output differ before folding one in" check that
   caught my-designer/my-fact-check as duplicates of MyAdvisor/MyKnowledger.
+- **MyArchivist and MyLibrarian share only an English word, not a shape.**
+  MyLibrarian recommends software packages to depend on; MyArchivist
+  catalogs a human's own books/materials collection. No shared corpus,
+  output, or code — flagged here purely because the naming collision (both
+  read as "library" tools) is likely to cause confusion in conversation,
+  not because the tools compete for the same job, unlike the my-designer/
+  my-fact-check cases above.
 - **Decision authority across MyOrchestrator / MyPlanner / MyProjector —
   resolved 2026-07-07.** Adding two more fleet-wide tools risked three
   sources of truth disagreeing about "what happens next." The line:
