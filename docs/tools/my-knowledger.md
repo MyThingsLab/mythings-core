@@ -14,6 +14,11 @@ label `my-knowledger`.
 
 ## The single Engine call
 
+Two subcommands, each a separate invocation making exactly one Engine call
+(same per-run discipline as MyResearcher's `brief`/`plan` split).
+
+### `ask` (default)
+
 Required: "answer this question using only the given excerpts from the
 external knowledge graph."
 
@@ -29,27 +34,55 @@ external knowledge graph."
 - Against `NoopEngine`: no synthesis — prints the retrieved passages
   verbatim with their source citations, same honest degrade as MyWiki.
 
+### `verify` (absorbs the "my-fact-check" idea, 2026-07-08)
+
+A separately proposed "my-fact-check" turned out to be the identical
+"retrieve, then the model may only cite the given excerpts" shape as
+`ask`, just phrased as a claim to check rather than a question to answer.
+Added as a second subcommand on this tool instead of a sixth standalone
+"retrieve then cite" repo.
+
+Required: "using only the given excerpts, judge whether this claim holds."
+
+- **Input:** the claim (issue title + body) plus the same
+  `graphify query "<claim>"` shortlist as `ask`. `context =
+  {"claim_issue": N, "candidate_count": k}`.
+- **Output:** `data = {"verdict": "supported"|"contradicted"|"unclear",
+  "explanation": str, "cited": [source_id, ...]}` — same cite-only
+  discipline as `ask`; `"unclear"` is the honest answer when the corpus
+  neither supports nor contradicts the claim, not a forced binary.
+- Against `NoopEngine`: `verdict="unclear"`, explanation = the retrieved
+  passages verbatim — same honest degrade as `ask`.
+
 ## Deterministic pre-work
 
-1. Read the question issue (label `my-knowledger`).
+Both subcommands share the same steps, keyed on the question or claim text:
+
+1. Read the issue (label `my-knowledger`).
 2. Confirm an external-knowledge `graphify-out/` corpus already exists —
    see the invariant below; MyKnowledger never builds one.
-3. Run `graphify query "<question>"` (or `--dfs` to trace one specific
-   thread) against that corpus.
+3. Run `graphify query "<question-or-claim>"` (or `--dfs` to trace one
+   specific thread) against that corpus.
 4. Cap the retrieved excerpt set with graphify's own `--budget` flag — same
    size-cap discipline as every other retrieval tool in this batch
    (MySearcher's candidate cap, MyReviewer's diff cap, MyWiki's shortlist
    cap).
 5. If retrieval returns nothing, skip the Engine call and post "no
-   relevant source found in the knowledge corpus" — same deterministic
+   relevant source found in the knowledge corpus" (`ask`) or "no source
+   to confirm or contradict this claim" (`verify`) — same deterministic
    short-circuit as MyWiki's no-match case.
 
 ## Ledger
 
-- **Writes:** `kind=knowledge`, `outcome=success|skipped`, `detail`=the
-  question (truncated), `data={question, cited_sources, comment_url}`.
+- **`ask` writes:** `kind=knowledge`, `outcome=success|skipped`,
+  `detail`=the question (truncated), `data={question, cited_sources,
+  comment_url}`.
+- **`verify` writes:** `kind=fact_check`, `outcome=success|skipped`,
+  `detail`=the claim (truncated), `data={claim, verdict, cited_sources,
+  comment_url}` — a distinct `kind` so verify entries never collide with
+  `ask` entries.
 - **Reads:** nothing beyond the external graph — no dedupe needed; the same
-  question can be asked more than once without collision (unlike
+  question or claim can be asked more than once without collision (unlike
   MyReviewer/MyDescriber, which dedupe against an unchanged diff).
 
 ## Guard & Workspace
@@ -69,17 +102,24 @@ external knowledge graph."
 ## CLI surface
 
 ```
-myknowledger ask --issue <number> [--corpus-path <path>]
+myknowledger ask    --issue <number> [--corpus-path <path>]
+myknowledger verify --issue <number> [--corpus-path <path>]
 ```
 
 ## Test plan
 
-- **Happy path:** a fixture external graph (a couple of ingested-paper
-  nodes) and a question matching one of them; scripted `Engine` reply
-  citing it; assert the comment includes the citation and
+- **`ask` happy path:** a fixture external graph (a couple of
+  ingested-paper nodes) and a question matching one of them; scripted
+  `Engine` reply citing it; assert the comment includes the citation and
   `kind=knowledge`/`outcome=success` is written.
-- **Edge case (no match):** retrieval returns nothing; assert the Engine is
-  never called (verify via a spy `Engine`) and `outcome=skipped`.
+- **`ask` edge case (no match):** retrieval returns nothing; assert the
+  Engine is never called (spy `Engine`) and `outcome=skipped`.
+- **`verify` happy path:** the same fixture graph with a claim it
+  contradicts; scripted `Engine` reply with `verdict="contradicted"`;
+  assert the comment renders the verdict + citation and
+  `kind=fact_check`/`outcome=success` is written.
+- **`verify` edge case (no match):** assert the Engine is never called and
+  `outcome=skipped`, mirroring `ask`'s edge case.
 - Mock `github.Runner` and the `graphify`/`graphifyy` CLI subprocess
   boundary (same fake-runner style as MyGrapher's tests); never mock the
   retrieval-then-cite shape itself.

@@ -30,7 +30,14 @@ class CIStatus(StrEnum):
     FAILURE = "failure"
 
 
-_FAILURE_CONCLUSIONS = {"FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"}
+_FAILURE_CONCLUSIONS = {
+    "FAILURE",
+    "ERROR",
+    "CANCELLED",
+    "TIMED_OUT",
+    "ACTION_REQUIRED",
+    "STARTUP_FAILURE",
+}
 
 
 @dataclass(frozen=True)
@@ -107,8 +114,23 @@ class GitHub:
         rollup = json.loads(self._run(self._argv(argv))).get("statusCheckRollup") or []
         return _rollup_status(rollup)
 
+    def create_issue(self, *, title: str, body: str) -> Issue:
+        argv = ["issue", "create", "--title", title, "--body", body]
+        url = self._run(self._argv(argv)).strip().splitlines()[-1]
+        return Issue(number=_issue_number(url), title=title, body=body, url=url)
+
+    def add_labels(self, number: int, labels: list[str]) -> None:
+        argv = ["issue", "edit", str(number)]
+        for label in labels:
+            argv += ["--add-label", label]
+        self._run(self._argv(argv))
+
 
 def _pr_number(url: str) -> int:
+    return int(url.rstrip("/").rsplit("/", 1)[-1])
+
+
+def _issue_number(url: str) -> int:
     return int(url.rstrip("/").rsplit("/", 1)[-1])
 
 
@@ -117,7 +139,8 @@ def _rollup_status(rollup: list[dict[str, str]]) -> CIStatus:
         return CIStatus.NONE
     saw_pending = False
     for check in rollup:
-        # CheckRun carries status/conclusion; StatusContext carries state.
+        # CheckRun carries status/conclusion; StatusContext carries state
+        # (both "FAILURE" and "ERROR" states mean the check failed).
         state = check.get("state")
         if state in _FAILURE_CONCLUSIONS or check.get("conclusion") in _FAILURE_CONCLUSIONS:
             return CIStatus.FAILURE

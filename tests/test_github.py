@@ -85,8 +85,36 @@ def test_rollup_status_aggregation() -> None:
     # A StatusContext uses `state` rather than status/conclusion.
     assert _rollup_status([{"state": "SUCCESS"}]) is CIStatus.SUCCESS
     assert _rollup_status([{"state": "PENDING"}]) is CIStatus.PENDING
+    # A failed StatusContext reports either FAILURE or ERROR; both are failures.
+    assert _rollup_status([{"state": "FAILURE"}]) is CIStatus.FAILURE
+    assert _rollup_status([{"state": "ERROR"}]) is CIStatus.FAILURE
+    assert _rollup_status([{"state": "SUCCESS"}, {"state": "ERROR"}]) is CIStatus.FAILURE
 
 
 def test_pr_status_reads_rollup() -> None:
     fake = FakeGh(json.dumps({"statusCheckRollup": [{"state": "SUCCESS"}]}))
     assert GitHub(runner=fake).pr_status(3) is CIStatus.SUCCESS
+
+
+def test_create_issue_extracts_number_from_url() -> None:
+    fake = FakeGh("https://github.com/o/r/issues/13\n")
+    issue = GitHub(runner=fake).create_issue(title="t", body="b")
+
+    assert issue.number == 13
+    assert issue.title == "t"
+    assert issue.body == "b"
+    argv = fake.calls[0]
+    assert argv[:2] == ["issue", "create"]
+    assert "--title" in argv and "t" in argv
+    assert "--body" in argv and "b" in argv
+
+
+def test_add_labels_sends_one_flag_per_label() -> None:
+    fake = FakeGh("")
+    GitHub(repo="o/r", runner=fake).add_labels(13, ["my-uni", "my-researcher"])
+
+    argv = fake.calls[0]
+    assert argv[:3] == ["issue", "edit", "13"]
+    assert argv.count("--add-label") == 2
+    assert "my-uni" in argv and "my-researcher" in argv
+    assert argv[-2:] == ["--repo", "o/r"]
