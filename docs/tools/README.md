@@ -43,6 +43,7 @@ dedicated (not-a-tool) template repo — build that before MyScaffolder.
 | MyNews | discovers current sources on a schedule and posts a dated digest since the last run | "write a digest from these newly discovered items" | [my-news.md](my-news.md) |
 | MyConductor | orders the fleet's open PRs into a coherent, dependency-safe merge sequence | "order these PRs into a coherent merge story, within the given constraints" | [my-conductor.md](my-conductor.md) |
 | MySyndicator | applies one change to many repos, one PR each (deterministic fan-out) | none — deterministic | [my-syndicator.md](my-syndicator.md) |
+| MySecurity | scans every repo for leaked secrets (full git history) and vulnerable dependencies, opens a redacted issue | optional: "write a remediation summary from these redacted findings" | [my-security.md](my-security.md) |
 | MyCoder | issue → diff → PR (the "act" tool) | deferred | see stub below |
 
 ## Recommended build order
@@ -152,6 +153,13 @@ dedicated (not-a-tool) template repo — build that before MyScaffolder.
     as MyResearcher; build alongside or after it, reusing its
     provider-config pattern. First doc whose primary trigger is a
     `schedule:` cron rather than an opened issue.
+24. **MySecurity** — added 2026-07-08, in response to the "how do we keep
+    secrets out of commits and out of LLMs" question. Shares MyDriftWatcher's
+    advisory ("flags, doesn't fix") stance and its `repo_list`/full-scan-all-
+    repos shape closely enough that building it right after MyDriftWatcher
+    avoids re-deriving that pattern. Not blocked on anything else; the real
+    gate is confirming the `gitleaks` CI toolchain addition (see cross-cutting
+    note below), same category of decision as MyTypster's `typst` addition.
 
 ## Cross-cutting notes
 
@@ -332,6 +340,20 @@ dedicated (not-a-tool) template repo — build that before MyScaffolder.
   Do this the next time a third tool needs it (or alongside MyConductor, which
   will want the same fixture). This shrinks what MySyndicator ever has to fan
   out to genuinely per-repo files (CI yaml, vendored `HARNESS.md`, banners).
+- **MySecurity is detection-only; "my-secrets" (a secrets store) was
+  considered and rejected.** A tool that persists secrets is a liability the
+  fleet doesn't need to own — GitHub Actions Secrets (already wired per the
+  branch-protection work) already covers CI-time storage, and an external
+  vault is the answer if that ever stops being enough. MySecurity's own doc
+  flags a second new-toolchain-dependency case (`gitleaks` in the CI image,
+  same "confirm before implementing" bar as MyTypster's `typst` addition) and
+  a hard, non-configurable redaction rule: a finding's literal secret value
+  never reaches the ledger, an issue body, or an Engine prompt — only file,
+  line, commit, rule id, and a truncated preview. Nearer-term than the tool
+  itself, the same conversation also flagged a `.claude/settings.json`
+  permission deny-list (blocking `Read`/`Grep` on `.env*`, `*.pem`,
+  `*credentials*`, `*secret*`) as a same-day config change, not something
+  that waits on MySecurity shipping.
 
 ## MyCoder (deferred)
 
