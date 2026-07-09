@@ -60,9 +60,16 @@ Required, in `wish`: "match this plain-language wish to the fleet catalog."
 
 ## Deterministic pre-work
 
-1. Load the fleet catalog: read `docs/tools/*.md` frontmatter from
-   `my-things-core` via the GitHub contents API (MyIdea's precedent — no
-   local core checkout assumed), keeping `status: shipped`.
+1. Load the fleet catalog from `tools_manifest.json`, the canonical registry,
+   which ships as package data inside `mythings`. Keep `status: shipped` for
+   the cards; keep **every** repo, whatever its status, for the blast-radius
+   denylist below.
+
+   Read the manifest, **not** `docs/tools/*.md` frontmatter: several shipped
+   tools (`my-guard`, `my-server`) have no design doc at all, so the doc set
+   under-reports the fleet — and an omission in the denylist would let a live
+   repo pass as a playground. Read the data file, never the private
+   `mythings._manifest` module (core's `__all__` is contracts-only).
 2. Join each shipped tool against `phrasebook.toml` — this repo's curated,
    human-reviewed, plain-language layer:
 
@@ -167,6 +174,8 @@ not exist" rule, and belongs in this repo's CI.
   a repo present in the manifest, refuses.
 - Drift: a phrasebook entry for an unshipped tool fails `check`; a shipped
   tool with no entry renders under "Not yet explained".
+- Denylist completeness: a shipped tool that has **no design doc**
+  (`my-server`) is still refused as a playground target.
 - `Policy` `DENY` / unattended `ASK`: narration prints, nothing enqueues.
 
 ## Dependencies & build order
@@ -178,12 +187,14 @@ Reads the catalog `my-docs` already publishes; adds no new core contract.
 
 **Open questions:**
 
-- The catalog reads `docs/tools/*.md` frontmatter over the GitHub contents
-  API rather than importing `mythings._manifest`, which is deliberately
-  build tooling and not exported (core's `__all__` is contracts-only). If a
-  second consumer ever needs it at runtime, promote a public read-only
-  `mythings.manifest` in one deliberate core PR — do **not** let MyGuide
-  reach into the private module.
+- The catalog reads the `tools_manifest.json` **data file** shipped inside
+  `mythings`, rather than importing `mythings._manifest`, which is
+  deliberately build tooling and not exported (core's `__all__` is
+  contracts-only). That leaves MyGuide depending on a package-data path that
+  is not a public contract. Since a safety property (the blast-radius
+  denylist) now rests on it, promote a public read-only `mythings.manifest`
+  in one deliberate core PR — and until then, do **not** let any tool reach
+  into the private module.
 - Free-text inbound over Telegram needs an "inbound command" contract
   before it can exist. Worth designing on its own, together with the six
   parked personal-service tools that need the same thing.
