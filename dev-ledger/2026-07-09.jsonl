@@ -1,0 +1,1 @@
+{"data":{"files":"docs/tools/my-scraper.md","session":"2026-07-09"},"detail":"Re-synced docs/tools/my-scraper.md frontmatter from the manifest and added the missing historical banner (PR #53 shipped the doc without either, which broke main's CI via test_tools_manifest.py)","kind":"fix","outcome":"success","tool":"claude-code","ts":"2026-07-09T15:35:30Z"}
