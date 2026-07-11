@@ -521,6 +521,29 @@
     "depends_on": []
   },
   {
+    "tool": "MyDirector",
+    "repo": "my-director",
+    "package": "mydirector",
+    "title": "the fleet's control plane: turns the operator's supervisory decision into an action, and explains the fleet's behaviour back to them",
+    "added": "2026-07-12",
+    "status": "designed",
+    "backlog_label": "my-director",
+    "engine_call": "explain why the fleet did this, from its ledger entries and the diff",
+    "ledger_kinds": [
+      "direct",
+      "merged",
+      "halted",
+      "planned",
+      "explained"
+    ],
+    "depends_on": [
+      "tool:my-conductor",
+      "tool:my-planner",
+      "tool:my-reporter",
+      "tool:my-guard"
+    ]
+  },
+  {
     "tool": "MySyndicator",
     "repo": "my-syndicator",
     "package": "mysyndicator",
