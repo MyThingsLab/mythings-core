@@ -1,6 +1,14 @@
 import json
 
-from mythings.engine import ClaudeCLIEngine, Engine, EngineRequest, EngineResult, NoopEngine
+from mythings.engine import (
+    CachingEngine,
+    ClaudeCLIEngine,
+    Engine,
+    EngineRequest,
+    EngineResult,
+    MeteredEngine,
+    NoopEngine,
+)
 
 
 class _FakeRunner:
@@ -195,3 +203,123 @@ def test_caching_engine_leaves_no_temp_file(tmp_path):
         EngineRequest(prompt="p")
     )
     assert [p.suffix for p in cache.iterdir()] == [".json"]
+
+
+# --- the engine-boundary contract -------------------------------------------
+#
+# The one non-deterministic seam is exactly where a silent degradation cannot
+# be caught by any tool's own NoopEngine-based tests (the context-drop and
+# fence-wrapping defects both shipped through green CI). These tests pin the
+# boundary's contract for every backend in this module.
+
+_CANARY = "CATALOG-CANARY-9f31"
+
+
+def _all_backends(tmp_path):
+    fake = _FakeRunner(json.dumps({"result": "ok"}))
+    return [
+        NoopEngine("ok"),
+        ClaudeCLIEngine(runner=fake),
+        CachingEngine(NoopEngine("ok"), tmp_path / "cache"),
+        MeteredEngine(NoopEngine("ok"), _FakeLedger(), tool="t"),
+    ]
+
+
+def test_every_backend_satisfies_the_protocol_and_returns_text(tmp_path) -> None:
+    for backend in _all_backends(tmp_path):
+        assert isinstance(backend, Engine)
+        result = backend.run(EngineRequest(prompt="x", context={"k": "v"}))
+        assert isinstance(result, EngineResult)
+        assert isinstance(result.text, str)
+
+
+def test_context_is_never_transmitted_to_the_model() -> None:
+    # EngineRequest.context is cache-key/audit metadata. Grounding a call on
+    # it is the my-guide.wish() bug: the tool's NoopEngine tests pass while
+    # the real model never sees the catalog. Pin the contract: nothing from
+    # context may reach the CLI's argv.
+    fake = _FakeRunner(json.dumps({"result": "ok"}))
+    ClaudeCLIEngine(runner=fake).run(
+        EngineRequest(prompt="route this wish", context={"catalog": _CANARY})
+    )
+    argv = fake.calls[0]
+    assert all(_CANARY not in token for token in argv)
+    assert all("catalog" not in token for token in argv)
+
+
+def test_context_still_distinguishes_cache_entries(tmp_path) -> None:
+    # The flip side of the same contract: context is part of CachingEngine's
+    # key, so two calls differing only in context are cached separately.
+    cache = CachingEngine(NoopEngine("ok"), tmp_path / "cache")
+    cache.run(EngineRequest(prompt="p", context={"n": 1}))
+    cache.run(EngineRequest(prompt="p", context={"n": 2}))
+    assert len(list((tmp_path / "cache").glob("*.json"))) == 2
+
+
+# --- MeteredEngine -----------------------------------------------------------
+
+
+class _FakeLedger:
+    def __init__(self) -> None:
+        self.entries: list[dict] = []
+
+    def record(self, **fields) -> None:
+        self.entries.append(fields)
+
+
+def test_metered_engine_ledgers_cost_from_the_cli_envelope() -> None:
+    fake = _FakeRunner(json.dumps({"result": "ok", "total_cost_usd": 0.0421}))
+    ledger = _FakeLedger()
+    metered = MeteredEngine(
+        ClaudeCLIEngine(runner=fake), ledger, tool="mydocs", model="claude-haiku-4-5"
+    )
+
+    result = metered.run(EngineRequest(prompt="gloss this page"))
+
+    assert result.text == "ok"
+    (entry,) = ledger.entries
+    assert entry["tool"] == "mydocs"
+    assert entry["kind"] == "engine_usage"
+    assert entry["outcome"] == "success"
+    assert entry["cost_usd"] == 0.0421
+    assert entry["model"] == "claude-haiku-4-5"
+    assert entry["prompt_chars"] == len("gloss this page")
+    assert entry["reply_chars"] == len("ok")
+
+
+def test_metered_engine_records_empty_outcome_with_zero_cost() -> None:
+    ledger = _FakeLedger()
+    MeteredEngine(NoopEngine(""), ledger, tool="t").run(EngineRequest(prompt="x"))
+    (entry,) = ledger.entries
+    assert entry["outcome"] == "empty"
+    assert entry["cost_usd"] == 0.0
+
+
+def test_metered_engine_passes_the_request_through_unchanged() -> None:
+    seen: list[EngineRequest] = []
+
+    class Spy:
+        def run(self, request: EngineRequest) -> EngineResult:
+            seen.append(request)
+            return EngineResult(text="ok")
+
+    request = EngineRequest(prompt="p", system="s", context={"k": "v"})
+    MeteredEngine(Spy(), _FakeLedger(), tool="t").run(request)
+    assert seen == [request]
+
+
+def test_cache_over_meter_bills_and_meters_once(tmp_path) -> None:
+    # The documented composition: CachingEngine(MeteredEngine(backend)). The
+    # second identical request is a cache hit -- it bills nothing, so it must
+    # meter nothing.
+    fake = _FakeRunner(json.dumps({"result": "ok", "total_cost_usd": 0.05}))
+    ledger = _FakeLedger()
+    engine = CachingEngine(
+        MeteredEngine(ClaudeCLIEngine(runner=fake), ledger, tool="t"), tmp_path / "cache"
+    )
+
+    engine.run(EngineRequest(prompt="same"))
+    engine.run(EngineRequest(prompt="same"))
+
+    assert len(fake.calls) == 1
+    assert len(ledger.entries) == 1

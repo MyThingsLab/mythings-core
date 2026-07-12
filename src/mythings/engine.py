@@ -5,6 +5,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -20,6 +21,9 @@ Runner = Callable[[list[str]], str]
 class EngineRequest:
     prompt: str
     system: str = ""
+    # Cache-key / audit metadata ONLY -- no backend transmits it to the model.
+    # Anything the model must actually see (grounding, candidate lists, a
+    # catalog to choose from) goes in `prompt`. See docs/ARCHITECTURE.md.
     context: dict[str, Any] = field(default_factory=dict)
 
 
@@ -144,4 +148,40 @@ class CachingEngine:
             tmp = entry.with_suffix(f".{os.getpid()}.tmp")
             tmp.write_text(json.dumps({"text": result.text, "data": result.data}), encoding="utf-8")
             tmp.replace(entry)
+        return result
+
+
+class MeteredEngine:
+    # Wraps any Engine and appends one kind=engine_usage entry per run() to a
+    # Ledger, so per-tool Engine spend is reconstructable from the ledger the
+    # way dispatched-worker spend already is. ClaudeCLIEngine's CLI reply
+    # carries total_cost_usd in its JSON envelope; until now every consumer
+    # dropped it on the floor, so the fleet's per-call spend was unknowable.
+    #
+    # Composition order matters: wrap the billed backend directly and put the
+    # cache outside -- CachingEngine(MeteredEngine(ClaudeCLIEngine(...), ...))
+    # -- so a cache hit, which bills nothing, meters nothing.
+    def __init__(self, delegate: Engine, ledger: Any, *, tool: str, model: str = "") -> None:
+        # `ledger` is any object with Ledger's record(**fields) shape; typed
+        # loosely to keep this module import-free of mythings.ledger.
+        self._delegate = delegate
+        self._ledger = ledger
+        self._tool = tool
+        self._model = model
+
+    def run(self, request: EngineRequest) -> EngineResult:
+        started = time.monotonic()
+        result = self._delegate.run(request)
+        cost = float(result.data.get("total_cost_usd") or 0.0)
+        self._ledger.record(
+            tool=self._tool,
+            kind="engine_usage",
+            outcome="success" if result.text else "empty",
+            detail=f"engine call: ${cost:.4f} ({self._model or 'default model'})",
+            cost_usd=cost,
+            model=self._model,
+            duration_s=round(time.monotonic() - started, 3),
+            prompt_chars=len(request.prompt),
+            reply_chars=len(result.text),
+        )
         return result
