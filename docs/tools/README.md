@@ -54,6 +54,7 @@ narrative; the manifest is canonical for status/dependency data.
 | MyProfessor | teaches or quizzes on a topic already in MyKnowledger's corpus | "write a lesson" / "grade this answer" | [my-professor.md](my-professor.md) |
 | MyNews | discovers current sources on a schedule and posts a dated digest since the last run | "write a digest from these newly discovered items" | [my-news.md](my-news.md) |
 | MyConductor | orders the fleet's open PRs into a coherent, dependency-safe merge sequence | "order these PRs into a coherent merge story, within the given constraints" | [my-conductor.md](my-conductor.md) |
+| MyDirector | the fleet's control plane: turns the operator's supervisory decision into an action (merge, halt, approve a plan) and explains the fleet's behaviour back to them | "explain why the fleet did this, from its ledger entries and the diff" | [my-director.md](my-director.md) |
 | MySyndicator | applies one change to many repos, one PR each (deterministic fan-out) | none — deterministic | [my-syndicator.md](my-syndicator.md) |
 | MyArchivist | catalogs a personal book/materials collection (physical + digital) into a unified, cross-referenced index | optional: "assign a subject tag + blurb" | [my-archivist.md](my-archivist.md) |
 | MySecurity | scans every repo for leaked secrets (full git history) and vulnerable dependencies, opens a redacted issue | optional: "write a remediation summary from these redacted findings" | [my-security.md](my-security.md) |
