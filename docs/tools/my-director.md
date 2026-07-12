@@ -74,12 +74,29 @@ touching the halt marker, recording a plan decision.
 
 ## Invariants
 
-- **Never merges autonomously.** MyDirector executes a merge *the operator
-  explicitly tapped*. The tap **is** the human merging — which is exactly what the
-  fleet rule ("a human always merges") has always required, and what it silently
-  cost: today that human must be at a laptop, which has made the rule the fleet's
-  throughput bottleneck. **No Engine call may ever cause a merge.** The Engine may
-  explain a merge; it may never decide one.
+- **Never merges autonomously — and the `Policy` enforces that, not this tool's
+  good manners.** MyDirector *proposes* a merge by evaluating a
+  `myguard.MERGE_ACTION` (`pr-merge`) Action. MyGuard answers **ASK**, which means:
+  unattended, with no ask channel, it collapses to `DENY` and nothing merges; with a
+  human reachable, it becomes a real Allow/Deny prompt on their phone. **The tap is
+  the human merging** — which is what the fleet rule always required, and what until
+  now cost a trip to a laptop.
+
+  This is deliberately *not* a bespoke button. It rides the ask channel, which is
+  already fail-closed, already operator-only (an ask prompt goes only to
+  `TELEGRAM_CHAT_ID`, and the daemon drops `ASK_DECISIONS` callbacks from every other
+  chat), and carries no client-supplied `callback_data` naming a PR that could be
+  forged. The fiddliest, most security-sensitive part of merge-from-chat was already
+  solved by machinery built for another reason.
+
+  **No Engine call may ever cause a merge.** The Engine may explain a merge; it may
+  never decide one.
+
+  *This invariant was nearly a lie:* a structured merge Action matched no MyGuard
+  rule, fell through to the permissive default, and came back `ALLOW` — unattended,
+  no human. MyDirector would have merged on its own while its design doc claimed it
+  could not. Fixed in `my-guard#11`; the lesson is that an invariant a tool merely
+  *intends* is not an invariant.
 - **No `Workspace`.** It never authors code and never opens a PR. It merges,
   halts, and records decisions about PRs *other tools authored*.
 - **Every write passes `Policy`**, the same seam as every other GitHub write in
@@ -99,8 +116,8 @@ touching the halt marker, recording a plan decision.
 | verb | Engine? | writes? | what it is |
 |---|---|---|---|
 | `status` | no | no | what the fleet is doing, what it cost, what is stuck |
-| `prs` | no | no | open PRs that are green and mergeable, in MyConductor's order |
-| `merge <pr>` | no | **yes** (`Policy`-gated) | executes a merge the operator tapped |
+| `prs` | no | no | open PRs that are green and mergeable, in MyConductor's order. Read-only, so the operator can *pull* the state — the ask channel is push-only and cannot answer "what can I merge right now?" |
+| `merge <pr>` | no | **yes** | proposes a `pr-merge` Action; MyGuard answers ASK, the operator taps, and *that* is the merge |
 | `halt` / `resume` | no | yes (marker file) | the kill switch |
 | `plan` | no | yes (plan ledger) | render MyPlanner's sequence; record approve/reorder/skip |
 | `why <ref>` | **yes** | no | the one Engine call |
@@ -133,8 +150,14 @@ right to.
   `.fleet-dispatch/HALT` is a coupling smell: that is fleet_dispatch's private
   state. A `mythings.halt` core seam — one marker, one reader, many arms — may be
   the honest shape once a second thing needs to halt the fleet.
-- **Does `merge` belong behind `ask` instead of behind a bespoke button?** The
-  `ASK` channel now exists and is exactly "a human confirms an action". A merge is
-  an action. There may be one mechanism here, not two.
+- ~~**Does `merge` belong behind `ask` instead of behind a bespoke button?**~~
+  **Resolved: yes.** It collapses two mechanisms into one, and the survivor was
+  already fail-closed and already operator-only. See `my-guard#11` and the analysis
+  on `fleet-dispatch#42`. The cost is honest: the ask channel is **push-only**, so
+  the operator cannot ask "what can I merge right now?" — which is why `prs` stays,
+  read-only.
+- **How many unanswered asks is a merge pass allowed to cost?** Each blocks up to
+  300s. Ten PRs with the operator asleep is fifty minutes of a cycle spent timing
+  out, one prompt at a time. There needs to be a "nobody is home, stop asking" rule.
 - **What is `status` when the fleet spans 30 repos?** It cannot be a wall of text.
   This likely wants MyDashboard's existing render rather than a new one.
