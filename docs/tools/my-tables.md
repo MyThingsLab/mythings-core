@@ -2,7 +2,7 @@
 tool: MyTables
 repo: my-tables
 package: mytables
-status: designed
+status: building
 added: 2026-07-12
 backlog_label: my-tables
 engine_call: match each detected table region to its nearest caption text and summarize what the table reports

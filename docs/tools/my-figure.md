@@ -2,7 +2,7 @@
 tool: MyFigure
 repo: my-figure
 package: myfigure
-status: designed
+status: building
 added: 2026-07-12
 backlog_label: my-figure
 engine_call: match each detected image region to its nearest caption text and write a one-line description

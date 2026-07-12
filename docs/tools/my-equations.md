@@ -2,7 +2,7 @@
 tool: MyEquations
 repo: my-equations
 package: myequations
-status: designed
+status: building
 added: 2026-07-12
 backlog_label: my-equations
 engine_call: transcribe one detected equation region to LaTeX and explain each symbol from surrounding prose
