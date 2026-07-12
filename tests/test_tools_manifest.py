@@ -33,6 +33,20 @@ def test_manifest_loads_with_valid_entries() -> None:
         assert t.added and t.tool and t.package
 
 
+def test_web_app_defaults_to_none_when_omitted() -> None:
+    tools = load_tools(json.dumps([_tool_stub("MyAlpha", "my-alpha", [])]))
+    assert tools[0].web_app is None
+
+
+def test_my_server_declares_a_local_web_app() -> None:
+    tools = {t.repo: t for t in load_tools()}
+    assert tools["my-server"].web_app == {
+        "run": "myserver serve",
+        "port": 8787,
+        "hosted_url": None,
+    }
+
+
 def test_depends_on_refs_resolve() -> None:
     tools = load_tools()
     repos = {t.repo for t in tools}
