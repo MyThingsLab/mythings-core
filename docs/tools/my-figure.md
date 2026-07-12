@@ -40,7 +40,7 @@ missing, truncated, or generic (e.g. "Figure 3" with no further text):
 description of what the figure shows."
 
 - **Input:** the extracted image, as a PNG-encoded `EngineRequest.images`
-  entry (core#110's addition — `ClaudeCLIEngine` sends it over the CLI's
+  entry (core#111's addition — `ClaudeCLIEngine` sends it over the CLI's
   stream-json wire format, the one path that actually attaches an image;
   MyImageProcessor's own Engine call is text-only and doesn't apply here),
   plus the page's plain text for context. `context = {"page": n,
