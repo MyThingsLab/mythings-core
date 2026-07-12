@@ -72,6 +72,23 @@ behavior; picking an actual cheap default for a given tool is that tool's
 separate, opt-in decision, never applied to a safety-critical call (e.g.
 `MyGuard`'s allow/ask/deny fall-through) by default.
 
+Two clarifications hardened by contract tests (2026-07):
+
+- **`EngineRequest.context` is metadata, not model input.** No backend
+  transmits it: `ClaudeCLIEngine` sends only `system` + `prompt`, and
+  `CachingEngine` folds `context` into its cache key. Anything the model must
+  actually see — grounding, candidate lists, a catalog to choose from —
+  belongs in `prompt` (my-idea's grounded-prompt pattern is the reference).
+  A tool that puts its grounding in `context` ships a call that passes its
+  `NoopEngine` tests and silently sees nothing in production — exactly the
+  degradation the deterministic side of the harness cannot catch on its own.
+- **`MeteredEngine`** wraps any backend and appends one `kind=engine_usage`
+  ledger entry per call (cost from the CLI reply's `total_cost_usd`, model,
+  duration, reply size), so per-tool Engine spend is reconstructable from the
+  ledger the way dispatched-worker spend already is. Compose it under the
+  cache — `CachingEngine(MeteredEngine(ClaudeCLIEngine(...), ...), ...)` — so
+  a cache hit, which bills nothing, meters nothing.
+
 ### `github` — the substrate adapter
 
 A thin wrapper over the `gh` CLI: list issues, open a PR, read a PR's CI status.
