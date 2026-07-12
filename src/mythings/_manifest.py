@@ -25,6 +25,10 @@ class ToolEntry:
     engine_call: str  # the single Engine call, or "none…" / "optional: …"
     ledger_kinds: list[str]  # the runtime-Ledger kinds this tool writes
     depends_on: list[str]  # "tool:<repo>" (built) or "core:<github.GitHub attr>"
+    # Optional: set once a tool ships a local server. `hosted_url` stays null
+    # until the tool is actually deployed somewhere reachable — that's a
+    # separate, later decision (hosting, auth, exposure beyond localhost).
+    web_app: dict | None = None
 
 
 STATUSES = ("designed", "building", "shipped")

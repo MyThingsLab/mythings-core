@@ -311,7 +311,12 @@
     "backlog_label": "my-server",
     "engine_call": "none \u2014 deterministic",
     "ledger_kinds": [],
-    "depends_on": []
+    "depends_on": [],
+    "web_app": {
+      "run": "myserver serve",
+      "port": 8787,
+      "hosted_url": null
+    }
   },
   {
     "tool": "MyCoder",
