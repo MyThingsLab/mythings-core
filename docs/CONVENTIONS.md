@@ -44,6 +44,7 @@ new tool = filling those.
 | Dependency vulnerabilities surfaced | this doc | `pip-audit` in `ci.yml` (warn-only) + Dependabot |
 | Critical bug halts new dispatch | this doc | `fleet_dispatch.py` / `fleet_cycle.py` check for open `critical`-labelled issues |
 | Tools agree with the core they import | this doc | `python -m mythings._compat --check` in core's CI |
+| Test fakes come from `mythings.testing` | this doc | review: a conftest re-declaring a shipped fake is a bug |
 
 ## Filing bugs
 
@@ -83,6 +84,50 @@ time. `python -m mythings._compat` is the gate that makes that impossible:
 
 Core's CI runs `--check` (claims + environment). The import scan needs sibling
 checkouts, so it belongs in `fleet_cycle.py`, not in a single repo's CI.
+
+## Shared test fixtures (`mythings.testing`)
+
+Every tool mocks the same boundaries — the `gh` runner, the Engine, HTTP
+`fetch`, real-git worktrees, JSONL ledgers — and for the first ~20 tools each
+repo hand-copied its own fakes, which drifted in naming and behavior.
+`mythings.testing` is the one shared copy:
+
+- `FakeGh(responses={("issue", "comment"): "url\n", ("pr", "create"): fn})` —
+  the `gh` boundary; replies keyed by subcommand prefix (`argv[:2]`, then
+  `argv[:1]`), values a string or a `Callable[[argv], str]` for stateful cases;
+  an unmatched call raises. Records `.calls`, asserts via `.saw(*prefix)`.
+- `ScriptedEngine(reply="", *, data=None)` — records `EngineRequest`s, returns
+  one canned `EngineResult`. The old `SpyEngine` is the default (empty) case.
+- `fake_fetch(responses, *, default=None)` — URL-substring → bytes/str/JSON.
+- `ledger_entry(...)` / `make_ledgers(root, shared=…, dev=…)` — deterministic
+  `LedgerEntry` factory and a repo root with shared + dev ledgers.
+- `make_git_repo(tmp_path, files=…) -> GitRepo` — a real worktree pushed to a
+  bare origin; `GitRepo.read_committed(branch, path)` asserts what was actually
+  pushed. Real git (this pattern, from 13 repos) is the standard; don't mock
+  git with a recording lambda.
+- Fixtures `clean_git_env` and `attended_env` — **not autouse**.
+
+Opt in from a tool's `tests/conftest.py`:
+
+```python
+pytest_plugins = ("mythings.testing",)
+```
+
+This is deliberately *not* a `pytest11` entry point: core is a runtime
+dependency of every tool, and an entry point would auto-load these fixtures
+into every pytest run in the shared venv. The one-line opt-in is greppable and
+scoped. A tool that wants `clean_git_env`/`attended_env` on every test re-wraps
+it locally:
+
+```python
+@pytest.fixture(autouse=True)
+def _attended(attended_env: None) -> None: ...
+```
+
+The module imports pytest, so it is test-support only — imported from test
+suites, never from tool runtime code. Rule: **don't hand-roll a fake that
+`mythings.testing` already provides**; domain-specific builders (EPUB payloads,
+manifest shapes) stay in the tool's own conftest.
 
 ## Coverage & badges
 
